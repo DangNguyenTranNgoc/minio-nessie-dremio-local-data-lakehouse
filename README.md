@@ -1,6 +1,18 @@
 # minio-nessie-dremio-local-data-lakehouse
 
-### Config Nessie Source for Dremio
+### Config Nessie Source for Dremio (By 🤖)
+
+```sh
+# Chmod script file if needed
+chmod 777 init-dremio.sh
+
+./init-dremio.sh
+```
+
+Take a 🧋/🥤/☕️ and wait.
+
+
+### Config Nessie Source for Dremio (By 🙌)
 
 **Name:** nessie
 
@@ -34,6 +46,7 @@ CREATE TABLE IF NOT EXISTS nessie.numbers (
     col1 INTEGER,
     col2 FLOAT
 );
+
 -- Insert data
 INSERT INTO nessie.numbers VALUES
     (23, 90.32),
@@ -41,8 +54,10 @@ INSERT INTO nessie.numbers VALUES
     (2, 91.237),
     (498, 123.456),
     (34, 89.089);
+
 -- Read table
 SELECT * FROM nessie.numbers;
+
 -- Delete table
 DROP TABLE IF EXISTS nessie.numbers;
 ```
