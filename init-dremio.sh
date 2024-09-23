@@ -4,6 +4,19 @@ source .env
 TOKEN=""
 NESSIE_SOURCE_CONFIG=""
 ERROR_MESSAGE=""
+SAMPLE_SQL_DATABASE="sample_db.sql"
+IMPORT_SAMPLE_DB=false
+
+extract_value_from_json() {
+    local key=$1
+    local json=$2
+    value=$(grep -oP "(?<=\"${key}\":\")[^\"]*" <<< "${json}")
+    if [[ ! -z "${value}" ]]; then
+        echo "${value}"
+    else
+        echo ""
+    fi
+}
 
 login() {
     local username=$1
@@ -18,23 +31,12 @@ login() {
         echo "[ERROR] Something went wrong when try to login"
         return 1
     fi
-    if [[ ! -z $(extract_value_from_json "errorMessage" "${authen}") ]]; then
-        echo "[ERROR] Something went wrong when try to login: ${authen}"
+    if [[ ! -z "$(extract_value_from_json 'errorMessage' ${authen})" ]]; then
+        echo "[ERROR] Something went wrong when try to login, ${authen}"
         return 1
     else
         echo "[INFO]  Login successfully: ${authen}"
         TOKEN=_dremio$(grep -oP '(?<="token":")[^"]*' <<< "${authen}")
-    fi
-}
-
-extract_value_from_json() {
-    local key=$1
-    local json=$2
-    value=$(grep -oP "(?<=\"${key}\":\")[^\"]*" <<< "${json}")
-    if [[ ! -z "${value}" ]]; then
-        echo "${value}"
-    else
-        echo ""
     fi
 }
 
@@ -75,13 +77,57 @@ check_nessie_catalog_config() {
     return 0
 }
 
-# check_error_response() {
-#     local error=$(grep -oP '(?<="errorMessage":")[^"]*' <<< "$1")
-#     if [[ -z "${error}" ]];then
-#         echo ${error}
-#     fi
-#     echo
-# }
+import_sample_db() {
+    echo "[INFO]  Import sample database"
+    if [[ -f "${SAMPLE_SQL_DATABASE}" ]]; then
+        curl -s -X POST 'http://localhost:9047/api/v3/sql' \
+            --header "${AUTH_HEADER}" \
+            --header 'Content-Type: application/json' \
+            -d "$(cat ${SAMPLE_SQL_DATABASE})"
+        if [ $? -ne 0 ]; then
+            echo "[ERROR] Something went wrong when import sample data"
+            exit 1
+        fi
+        echo "[INFO]  Done"
+    fi
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --import-sample)
+            IMPORT_SAMPLE_DB=true
+            shift
+            ;;
+        -h|--help)
+            cat <<HELPEOF
+
+NAME
+    Init setup Dremio in Docker compose
+
+SYNOPSIS
+    init-dremio [--import-sample] [-h | --help]
+
+DESCRIPTION
+    Mandatory arguments:
+    --import-sample Import sample database
+    -h, --help      Show this help
+---
+Variables:
+
+MB_PLUGINS_DIR          = ${MB_PLUGINS_DIR}
+MB_SETUP_TOKEN          = ${MB_SETUP_TOKEN}
+METABASE_EMAIL          = ${METABASE_EMAIL}
+METABASE_PASSWORD       = ${METABASE_PASSWORD}
+METABASE_ALLOW_TRACKING = ${METABASE_ALLOW_TRACKING}
+METABASE_SITE_NAME      = ${METABASE_SITE_NAME}
+SAMPLE_SQL_DATABASE     = ${SAMPLE_SQL_DATABASE}
+HELPEOF
+            exit 0
+            ;;
+        *)
+            ;;
+    esac
+done
 
 # Create admin user
 echo "[INFO]  Try to login with admin user"
@@ -118,7 +164,7 @@ AUTH_HEADER="Authorization: ${TOKEN}"
 response=$(curl -s -X GET 'http://localhost:9047/api/v3/catalog/by-path/nessie' \
                 --header "${AUTH_HEADER}" \
                 --header 'Content-Type: application/json')
-#{"errorMessage":"Could not find entity with path [[nessie]]","moreInfo":""}
+
 if [[ ! -z "${response}" && $(extract_value_from_json "errorMessage" "${response}") == "" ]]; then
     check_nessie_catalog_config "${response}"
     if [ $? -ne 0 ]; then
@@ -174,4 +220,8 @@ if [[ ! -z "${TOKEN}" ]]; then
     fi
     echo "[INFO]  Nessie catalog is created"
     exit 0
+fi
+
+if [[ "${IMPORT_SAMPLE_DB}" = true ]]; then
+    import_sample_db
 fi
